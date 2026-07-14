@@ -1,33 +1,111 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PageHeader from "../components/PageHeader";
+import { chatApi } from "../api";
 
 type Message = { role: "user" | "bot"; text: string };
 
-const INITIAL: Message[] = [];
-
 export default function Chatbot() {
-  const [messages, setMessages] = useState<Message[]>(INITIAL);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const streamRef = useRef<AbortController | null>(null);
+  const listRef = useRef<HTMLDivElement>(null);
 
-  const send = () => {
+  useEffect(() => {
+    const list = listRef.current;
+    if (list) list.scrollTop = list.scrollHeight;
+  }, [messages]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    streamRef.current = controller;
+
+    const restoreHistory = () => {
+      chatApi
+        .getHistory()
+        .then((res) =>
+          setMessages(
+            res.messages.map((m) => ({
+              role: m.role === "assistant" ? "bot" : "user",
+              text: m.content,
+            }))
+          )
+        )
+        .catch(() => {});
+    };
+
+    const initWithLocation = (lat: number, lon: number) => {
+      setMessages([{ role: "bot", text: "" }]);
+      chatApi
+        .init(
+          { lat, lon },
+          (chunk) => {
+            setMessages((prev) => {
+              const next = [...prev];
+              next[next.length - 1] = {
+                role: "bot",
+                text: next[next.length - 1].text + chunk.text,
+              };
+              return next;
+            });
+          },
+          controller.signal
+        )
+        .catch(restoreHistory);
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => initWithLocation(pos.coords.latitude, pos.coords.longitude),
+        restoreHistory
+      );
+    } else {
+      restoreHistory();
+    }
+
+    return () => controller.abort();
+  }, []);
+
+  const send = async () => {
     const text = input.trim();
-    if (!text) return;
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text },
-      {
-        role: "bot",
-        text:
-          "대전에 있는 쌀국수집으로는 쌀쌀국수(관저동), 쌀국수맛집(도마동), 가장싼집(둔산동), 얄라리얄라국수(내동)등이 있습니다.\n오늘은 한번 얄라리얄라국수 내동점에 들려보는 건 어떨까요?"
-      }
-    ]);
+    if (!text || sending) return;
     setInput("");
+    setMessages((prev) => [...prev, { role: "user", text }, { role: "bot", text: "" }]);
+    setSending(true);
+
+    const controller = new AbortController();
+    streamRef.current = controller;
+
+    try {
+      await chatApi.sendMessage(
+        { content: text },
+        (chunk) => {
+          setMessages((prev) => {
+            const next = [...prev];
+            next[next.length - 1] = {
+              role: "bot",
+              text: next[next.length - 1].text + chunk.text,
+            };
+            return next;
+          });
+        },
+        controller.signal
+      );
+    } catch {
+      setMessages((prev) => {
+        const next = [...prev];
+        next[next.length - 1] = { role: "bot", text: "답변을 불러오지 못했어요." };
+        return next;
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <PageHeader title="AI챗봇" />
-      <div className="flex flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
+      <div ref={listRef} className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-6">
         {messages.map((m, i) => (
           <div
             key={i}
@@ -46,9 +124,9 @@ export default function Chatbot() {
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && send()}
             placeholder="무엇을 도와드릴까요?"
-            className="flex-1 bg-transparent text-base outline-none placeholder:text-sub"
+            className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-sub"
           />
-          <button type="button" aria-label="전송" onClick={send}>
+          <button type="button" aria-label="전송" onClick={send} disabled={sending}>
             <svg viewBox="0 0 24 24" className="h-6 w-6 stroke-sub" fill="none" strokeWidth="1.8" strokeLinejoin="round">
               <path d="M4 5.5 20 12 4 18.5 6.5 12Z" />
             </svg>

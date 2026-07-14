@@ -1,11 +1,28 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ApiError, authApi } from "../api";
 import PageHeader from "../components/PageHeader";
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const login = async () => {
+    if (loading) return;
+    setError("");
+    setLoading(true);
+    try {
+      await authApi.login({ email, password });
+      navigate("/map");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "로그인에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -28,13 +45,15 @@ export default function Login() {
           placeholder="비밀번호를 입력해주세요"
           className="h-14 rounded-xl bg-field px-4 text-base outline-none placeholder:text-sub focus:ring-2 focus:ring-primary/40"
         />
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
         <div className="mt-auto pb-10">
           <button
             type="button"
-            onClick={() => navigate("/map")}
-            className="h-14 w-full rounded-xl bg-primary text-lg font-semibold text-white"
+            onClick={login}
+            disabled={loading}
+            className="h-14 w-full rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-60"
           >
-            로그인
+            {loading ? "로그인 중..." : "로그인"}
           </button>
           <p className="mt-3 text-center text-sm text-sub">
             계정이 없으신가요?{" "}

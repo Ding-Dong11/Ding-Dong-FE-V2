@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { ApiError, authApi } from "../api";
 import PageHeader from "../components/PageHeader";
 
 export default function SignupEmail() {
@@ -8,6 +9,9 @@ export default function SignupEmail() {
   const [code, setCode] = useState("");
   const [sent, setSent] = useState(false);
   const [remain, setRemain] = useState(180);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     if (!sent || remain <= 0) return;
@@ -17,6 +21,35 @@ export default function SignupEmail() {
 
   const mm = Math.floor(remain / 60);
   const ss = String(remain % 60).padStart(2, "0");
+
+  const sendCode = async () => {
+    if (sending || !email) return;
+    setError("");
+    setSending(true);
+    try {
+      await authApi.requestEmailCode({ email });
+      setSent(true);
+      setRemain(180);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "인증코드 발송에 실패했습니다.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const verifyAndNext = async () => {
+    if (verifying || !code) return;
+    setError("");
+    setVerifying(true);
+    try {
+      await authApi.verifyEmailCode({ email, code });
+      navigate("/signup/password", { state: { email } });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "인증코드 확인에 실패했습니다.");
+    } finally {
+      setVerifying(false);
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -30,18 +63,15 @@ export default function SignupEmail() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="이메일을 입력해주세요"
-            className="h-14 flex-1 rounded-xl bg-field px-4 text-base outline-none placeholder:text-sub focus:ring-2 focus:ring-primary/40"
+            className="h-14 min-w-0 flex-1 rounded-xl bg-field px-4 text-base outline-none placeholder:text-sub focus:ring-2 focus:ring-primary/40"
           />
           <button
             type="button"
-            disabled={sent}
-            onClick={() => {
-              setSent(true);
-              setRemain(180);
-            }}
-            className={`h-14 w-24 rounded-xl text-base font-semibold text-white ${sent ? "bg-[#DDE0E5]" : "bg-primary"}`}
+            disabled={sent || sending || !email}
+            onClick={sendCode}
+            className={`h-14 w-24 shrink-0 rounded-xl text-base font-semibold text-white ${sent ? "bg-[#DDE0E5]" : "bg-primary"}`}
           >
-            인증
+            {sending ? "전송 중" : "인증"}
           </button>
         </div>
         <label className="mb-2 text-base font-semibold">인증 코드</label>
@@ -61,13 +91,15 @@ export default function SignupEmail() {
             </span>
           )}
         </div>
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
         <div className="mt-auto pb-10">
           <button
             type="button"
-            onClick={() => navigate("/signup/password")}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-lg font-semibold text-white"
+            disabled={!sent || !code || verifying}
+            onClick={verifyAndNext}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-60"
           >
-            다음
+            {verifying ? "확인 중..." : "다음"}
             <svg viewBox="0 0 24 24" className="h-4 w-4 stroke-white" fill="none" strokeWidth="2.6" strokeLinecap="round">
               <path d="m9 5 7 7-7 7" strokeLinejoin="round" />
             </svg>

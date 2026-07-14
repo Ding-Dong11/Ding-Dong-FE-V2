@@ -1,0 +1,1705 @@
+openapi: 3.0.3
+info:
+  title: Ding-Dong11 API
+  version: 1.0.0
+  description: |
+    Ding-Dong11 백엔드 API 명세서.
+
+    ## 인증
+    로그인 성공 시 서버가 `access_token` 쿠키(non-httponly)를 발급합니다.
+    FE는 해당 값을 읽어 모든 인증 필요 요청에 `Authorization: Bearer <token>` 헤더로 포함해야 합니다.
+    리프레시 토큰은 `refresh_token` 쿠키(httponly)로 관리되며, `/api/v1/auth` 경로에서만 전송됩니다.
+
+    ## 에러 응답 공통 형식
+    ```json
+    { "code": "ERROR_CODE", "message": "에러 메시지" }
+    ```
+
+servers:
+  - url: http://localhost:8000
+    description: 로컬 개발 서버
+
+security: []
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: 로그인 후 access_token 쿠키 값을 Authorization 헤더에 Bearer로 첨부
+
+  schemas:
+    # ── 공통 에러 ────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          example: APP_ERROR
+        message:
+          type: string
+          example: 요청을 처리할 수 없습니다.
+      required: [code, message]
+
+    # ── Auth ─────────────────────────────────────────────────────────────────
+    EmailCodeRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+      required: [email]
+
+    EmailVerifyRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          example: "123456"
+      required: [email, code]
+
+    SignupRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: password123
+        password_confirm:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: password123
+      required: [email, password, password_confirm]
+
+    SignupResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: user@example.com
+      required: [user_id, email]
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: password123
+      required: [email, password]
+
+    LoginResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: user@example.com
+      required: [user_id, email]
+
+    WithdrawRequest:
+      type: object
+      properties:
+        password:
+          type: string
+          minLength: 8
+          maxLength: 20
+          example: password123
+      required: [password]
+
+    # ── Stores ───────────────────────────────────────────────────────────────
+    StoreMarker:
+      type: object
+      properties:
+        store_id:
+          type: integer
+          example: 42
+        store_name:
+          type: string
+          example: 홍길동 분식
+        longitude:
+          type: number
+          format: double
+          example: 127.1234567
+        latitude:
+          type: number
+          format: double
+          example: 37.4567890
+        has_active_qr:
+          type: boolean
+          description: 포인트 적립 가능 상가 여부 (뱃지 표시용)
+        has_disposition:
+          type: boolean
+          description: 행정처분 이력 존재 여부 (마커 색상 구분용)
+        has_sale:
+          type: boolean
+          description: 활성 할인 상품 존재 여부
+      required:
+        [
+          store_id,
+          store_name,
+          longitude,
+          latitude,
+          has_active_qr,
+          has_disposition,
+          has_sale,
+        ]
+
+    SaleProductSummary:
+      type: object
+      description: 마커 팝업 내 할인 상품 카드
+      properties:
+        sale_product_id:
+          type: integer
+          example: 101
+        name:
+          type: string
+          example: 치즈버거 세트
+        original_price:
+          type: integer
+          example: 8000
+        sale_price:
+          type: integer
+          example: 5000
+        image_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/images/burger.jpg
+        effective_status:
+          type: string
+          enum: [ON_SALE, SOLD_OUT, EXPIRED]
+          example: ON_SALE
+        discount_rate:
+          type: number
+          format: float
+          description: (원가 - 할인가) / 원가 * 100
+          example: 37.5
+      required:
+        [
+          sale_product_id,
+          name,
+          original_price,
+          sale_price,
+          effective_status,
+          discount_rate,
+        ]
+
+    DispositionSummary:
+      type: object
+      description: 마커 팝업 내 행정처분 이력 한 건
+      properties:
+        disposition_id:
+          type: integer
+          example: 5
+        type_name:
+          type: string
+          example: 영업정지
+        disposition_date:
+          type: string
+          format: date
+          example: "2024-03-15"
+        violation_content:
+          type: string
+          nullable: true
+          example: 위생기준 위반
+        legal_basis:
+          type: string
+          nullable: true
+          example: 식품위생법 제75조
+      required: [disposition_id, type_name, disposition_date]
+
+    StoreDetail:
+      type: object
+      description: 마커 클릭 팝업 전체 정보
+      properties:
+        store_id:
+          type: integer
+          example: 42
+        store_name:
+          type: string
+          example: 홍길동 분식
+        branch_name:
+          type: string
+          nullable: true
+          example: 강남점
+        road_address:
+          type: string
+          nullable: true
+          example: 서울특별시 강남구 테헤란로 123
+        jibun_address:
+          type: string
+          nullable: true
+          example: 서울특별시 강남구 역삼동 123-45
+        longitude:
+          type: number
+          format: double
+          example: 127.1234567
+        latitude:
+          type: number
+          format: double
+          example: 37.4567890
+        image_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/stores/42.jpg
+        has_active_qr:
+          type: boolean
+        sale_products:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleProductSummary"
+          description: 활성 할인 상품 (없으면 빈 배열)
+        dispositions:
+          type: array
+          items:
+            $ref: "#/components/schemas/DispositionSummary"
+          description: 행정처분 이력 (없으면 빈 배열)
+      required:
+        [
+          store_id,
+          store_name,
+          longitude,
+          latitude,
+          has_active_qr,
+          sale_products,
+          dispositions,
+        ]
+
+    # ── Rewards ──────────────────────────────────────────────────────────────
+    QrVerifyRequest:
+      type: object
+      properties:
+        qr_token:
+          type: string
+          minLength: 1
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      required: [qr_token]
+
+    QrVerifyResponse:
+      type: object
+      properties:
+        store_id:
+          type: integer
+          example: 42
+        store_name:
+          type: string
+          example: 홍길동 분식
+        awarded_point:
+          type: integer
+          example: 100
+        balance_after:
+          type: integer
+          example: 1350
+      required: [store_id, store_name, awarded_point, balance_after]
+
+    # ── Sales ─────────────────────────────────────────────────────────────────
+    SaleProductCard:
+      type: object
+      description: 피드 / 상점 상세 내 상품 카드
+      properties:
+        sale_product_id:
+          type: integer
+          example: 101
+        sale_store_id:
+          type: integer
+          example: 10
+        store_name:
+          type: string
+          example: 홍길동 분식
+        name:
+          type: string
+          example: 치즈버거 세트
+        original_price:
+          type: integer
+          example: 8000
+        sale_price:
+          type: integer
+          example: 5000
+        discount_rate:
+          type: number
+          format: float
+          example: 37.5
+        stock_quantity:
+          type: integer
+          example: 3
+        sale_deadline:
+          type: string
+          format: date-time
+          example: "2026-07-14T18:00:00Z"
+        effective_status:
+          type: string
+          enum: [ON_SALE, SOLD_OUT, EXPIRED]
+          example: ON_SALE
+        small_code:
+          type: string
+          nullable: true
+          example: "Q01"
+      required:
+        [
+          sale_product_id,
+          sale_store_id,
+          store_name,
+          name,
+          original_price,
+          sale_price,
+          discount_rate,
+          stock_quantity,
+          sale_deadline,
+          effective_status,
+        ]
+
+    FeedResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SaleProductCard"
+        total:
+          type: integer
+          example: 128
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        has_next:
+          type: boolean
+          example: true
+      required: [items, total, page, size, has_next]
+
+    SubscribeResponse:
+      type: object
+      properties:
+        subscribed:
+          type: boolean
+          example: true
+        sale_store_id:
+          type: integer
+          example: 10
+      required: [subscribed, sale_store_id]
+
+    SaleStoreMarker:
+      type: object
+      description: 세일 상점 지도 마커
+      properties:
+        sale_store_id:
+          type: integer
+          example: 10
+        name:
+          type: string
+          example: 홍길동 분식
+        longitude:
+          type: number
+          format: double
+          example: 127.1234567
+        latitude:
+          type: number
+          format: double
+          example: 37.4567890
+        is_expiring_soon:
+          type: boolean
+          description: ON_SALE 상품 중 2시간 이내 마감 상품 존재 여부
+      required: [sale_store_id, name, longitude, latitude, is_expiring_soon]
+
+    SaleProductDetail:
+      type: object
+      description: 상품 상세 — 재고·마감 실시간
+      properties:
+        sale_product_id:
+          type: integer
+          example: 101
+        sale_store_id:
+          type: integer
+          example: 10
+        store_name:
+          type: string
+          example: 홍길동 분식
+        name:
+          type: string
+          example: 치즈버거 세트
+        original_price:
+          type: integer
+          example: 8000
+        sale_price:
+          type: integer
+          example: 5000
+        discount_rate:
+          type: number
+          format: float
+          example: 37.5
+        stock_quantity:
+          type: integer
+          example: 3
+        sale_deadline:
+          type: string
+          format: date-time
+          example: "2026-07-14T18:00:00Z"
+        effective_status:
+          type: string
+          enum: [ON_SALE, SOLD_OUT, EXPIRED]
+          example: ON_SALE
+        small_code:
+          type: string
+          nullable: true
+          example: "Q01"
+      required:
+        [
+          sale_product_id,
+          sale_store_id,
+          store_name,
+          name,
+          original_price,
+          sale_price,
+          discount_rate,
+          stock_quantity,
+          sale_deadline,
+          effective_status,
+        ]
+
+    # ── Recommendations ───────────────────────────────────────────────────────
+    RecommendationItem:
+      type: object
+      properties:
+        store_id:
+          type: integer
+          example: 42
+        store_name:
+          type: string
+          example: 홍길동 분식
+        branch_name:
+          type: string
+          nullable: true
+          example: 강남점
+        road_address:
+          type: string
+          nullable: true
+          example: 서울특별시 강남구 테헤란로 123
+        jibun_address:
+          type: string
+          nullable: true
+          example: 서울특별시 강남구 역삼동 123-45
+        longitude:
+          type: number
+          format: double
+          example: 127.1234567
+        latitude:
+          type: number
+          format: double
+          example: 37.4567890
+        small_code:
+          type: string
+          nullable: true
+          example: "Q01"
+        image_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/stores/42.jpg
+      required: [store_id, store_name, longitude, latitude]
+
+    RecommendationResponse:
+      type: object
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-07-14"
+        top_small_code:
+          type: string
+          nullable: true
+          description: 사용자 이용 이력 기반 최선호 업종 코드 (이력 없으면 null)
+          example: "Q01"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RecommendationItem"
+      required: [date, items]
+
+    # ── Chat ─────────────────────────────────────────────────────────────────
+    ChatMessageRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          example: 근처에 맛있는 분식집 있어?
+        lat:
+          type: number
+          format: float
+          nullable: true
+          description: 현재 위치 위도 (생략 시 Redis 캐시 재사용)
+          example: 37.4567890
+        lon:
+          type: number
+          format: float
+          nullable: true
+          description: 현재 위치 경도
+          example: 127.1234567
+      required: [content]
+
+    ChatHistoryMessage:
+      type: object
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+          example: user
+        content:
+          type: string
+          example: 근처에 맛있는 분식집 있어?
+      required: [role, content]
+
+    ChatHistoryResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatHistoryMessage"
+      required: [messages]
+
+    # ── Coupons ───────────────────────────────────────────────────────────────
+    CouponItem:
+      type: object
+      properties:
+        coupon_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: 스타벅스 아메리카노 쿠폰
+        image_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/coupons/1.jpg
+        point_price:
+          type: integer
+          description: 쿠폰 구매에 필요한 포인트
+          example: 500
+        description:
+          type: string
+          nullable: true
+          example: 스타벅스 매장 어디서나 사용 가능
+      required: [coupon_id, name, point_price]
+
+    CouponDetail:
+      allOf:
+        - $ref: "#/components/schemas/CouponItem"
+
+    CouponPurchaseResponse:
+      type: object
+      properties:
+        user_coupon_id:
+          type: integer
+          example: 101
+        coupon_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: 스타벅스 아메리카노 쿠폰
+        barcode:
+          type: string
+          example: "8801234567890"
+        status:
+          type: string
+          enum: [UNUSED, USED, EXPIRED]
+          example: UNUSED
+        purchased_at:
+          type: string
+          format: date-time
+          example: "2026-07-14T10:30:00Z"
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-14T23:59:59Z"
+        balance_after:
+          type: integer
+          description: 구매 후 잔여 포인트
+          example: 850
+      required:
+        [
+          user_coupon_id,
+          coupon_id,
+          name,
+          barcode,
+          status,
+          purchased_at,
+          balance_after,
+        ]
+
+    # ── MyPage ────────────────────────────────────────────────────────────────
+    PointResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          example: 1
+        email:
+          type: string
+          example: user@example.com
+        point_balance:
+          type: integer
+          example: 1350
+      required: [user_id, email, point_balance]
+
+    UserCouponItem:
+      type: object
+      properties:
+        user_coupon_id:
+          type: integer
+          example: 101
+        coupon_id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: 스타벅스 아메리카노 쿠폰
+        image_url:
+          type: string
+          nullable: true
+          example: https://cdn.example.com/coupons/1.jpg
+        status:
+          type: string
+          enum: [UNUSED, USED, EXPIRED]
+          example: UNUSED
+        purchased_at:
+          type: string
+          format: date-time
+          example: "2026-07-14T10:30:00Z"
+        valid_until:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-08-14T23:59:59Z"
+      required: [user_coupon_id, coupon_id, name, status, purchased_at]
+
+    UserCouponDetail:
+      allOf:
+        - $ref: "#/components/schemas/UserCouponItem"
+        - type: object
+          properties:
+            barcode:
+              type: string
+              example: "8801234567890"
+            description:
+              type: string
+              nullable: true
+              example: 스타벅스 매장 어디서나 사용 가능
+          required: [barcode]
+
+    # ── Admin ─────────────────────────────────────────────────────────────────
+    QrIssueRequest:
+      type: object
+      properties:
+        reward_point:
+          type: integer
+          minimum: 1
+          description: 인증 시 지급할 포인트
+          example: 100
+      required: [reward_point]
+
+    QrIssueResponse:
+      type: object
+      properties:
+        qr_id:
+          type: integer
+          example: 7
+        store_id:
+          type: integer
+          example: 42
+        store_name:
+          type: string
+          example: 홍길동 분식
+        qr_token:
+          type: string
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        qr_url:
+          type: string
+          description: "QR 이미지로 인코딩할 URL. 형식: dingdong://verify?token=<UUID>"
+          example: "dingdong://verify?token=550e8400-e29b-41d4-a716-446655440000"
+        reward_point:
+          type: integer
+          example: 100
+        is_active:
+          type: boolean
+          example: true
+      required:
+        [qr_id, store_id, store_name, qr_token, qr_url, reward_point, is_active]
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+  /health:
+    get:
+      summary: 헬스 체크
+      tags: [health]
+      responses:
+        "200":
+          description: 정상
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  # ── Auth ───────────────────────────────────────────────────────────────────
+  /api/v1/auth/email/code:
+    post:
+      summary: 이메일 인증코드 요청
+      description: 입력한 이메일로 6자리 인증코드를 발송합니다. 60초 이내 재요청 시 429.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailCodeRequest"
+      responses:
+        "204":
+          description: 인증코드 발송 성공
+        "429":
+          description: 재요청 쿨다운 (60초)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: VERIFICATION_COOLDOWN
+                message: 잠시 후 다시 시도해주세요.
+
+  /api/v1/auth/email/verify:
+    post:
+      summary: 이메일 인증코드 확인
+      description: 발송된 6자리 코드를 검증합니다. 이후 signup 가능 상태가 됩니다.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailVerifyRequest"
+      responses:
+        "204":
+          description: 인증 성공
+        "400":
+          description: 코드가 틀리거나 만료됨
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_VERIFICATION_CODE
+                message: 인증코드가 올바르지 않거나 만료되었습니다.
+
+  /api/v1/auth/signup:
+    post:
+      summary: 회원가입
+      description: 이메일 인증 완료 후 호출. 비밀번호 8~20자.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignupRequest"
+      responses:
+        "201":
+          description: 회원가입 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignupResponse"
+        "400":
+          description: 이메일 인증 미완료 또는 비밀번호 불일치
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: 이미 가입된 이메일
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: DUPLICATE_EMAIL
+                message: 이미 가입된 이메일입니다.
+
+  /api/v1/auth/login:
+    post:
+      summary: 로그인
+      description: |
+        성공 시 `access_token`(non-httponly), `refresh_token`(httponly) 쿠키를 발급합니다.
+        FE는 `access_token` 쿠키 값을 읽어 `Authorization: Bearer <token>` 헤더로 사용합니다.
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: 로그인 성공
+          headers:
+            Set-Cookie:
+              description: access_token, refresh_token 쿠키 설정
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: 이메일 또는 비밀번호 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: INVALID_CREDENTIALS
+                message: 이메일 또는 비밀번호가 올바르지 않습니다.
+
+  /api/v1/auth/refresh:
+    post:
+      summary: 액세스 토큰 갱신
+      description: |
+        `refresh_token` 쿠키를 이용해 새 `access_token` 쿠키를 발급합니다.
+        리프레시 토큰은 요청 쿠키로 자동 전송됩니다 (path=/api/v1/auth).
+      tags: [auth]
+      responses:
+        "204":
+          description: 토큰 갱신 성공 (새 access_token 쿠키 발급)
+          headers:
+            Set-Cookie:
+              description: 갱신된 access_token 쿠키
+              schema:
+                type: string
+        "401":
+          description: 리프레시 토큰 없음 또는 유효하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/logout:
+    post:
+      summary: 로그아웃
+      description: 액세스 토큰을 블랙리스트에 등록하고 쿠키를 삭제합니다.
+      tags: [auth]
+      security:
+        - BearerAuth: []
+      responses:
+        "204":
+          description: 로그아웃 성공
+        "401":
+          description: 인증 토큰 없음 또는 유효하지 않음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/auth/withdraw:
+    post:
+      summary: 회원 탈퇴
+      description: 비밀번호 재확인 후 계정을 비활성화하고 로그아웃합니다.
+      tags: [auth]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WithdrawRequest"
+      responses:
+        "204":
+          description: 탈퇴 성공
+        "400":
+          description: 비밀번호 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: PASSWORD_MISMATCH
+                message: 비밀번호가 일치하지 않습니다.
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Stores ─────────────────────────────────────────────────────────────────
+  /api/v1/stores/markers:
+    get:
+      summary: 상가 지도 마커 목록
+      description: |
+        지도 뷰포트 내 상가 마커 목록을 반환합니다. (FUNC-003-01)
+        - `has_active_qr`: 포인트 적립 가능 여부 (뱃지 표시용)
+        - `has_disposition`: 행정처분 이력 마커 색상 구분용
+        - `has_sale`: 현재 할인 상품 존재 여부
+      tags: [stores]
+      parameters:
+        - name: min_lat
+          in: query
+          description: bbox 최소 위도
+          schema:
+            type: number
+            format: double
+        - name: max_lat
+          in: query
+          description: bbox 최대 위도
+          schema:
+            type: number
+            format: double
+        - name: min_lon
+          in: query
+          description: bbox 최소 경도
+          schema:
+            type: number
+            format: double
+        - name: max_lon
+          in: query
+          description: bbox 최대 경도
+          schema:
+            type: number
+            format: double
+        - name: limit
+          in: query
+          description: 최대 반환 건수 (1~2000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+            default: 1000
+      responses:
+        "200":
+          description: 마커 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoreMarker"
+
+  /api/v1/stores/{store_id}:
+    get:
+      summary: 상가 상세 조회
+      description: 마커 클릭 팝업 상세 정보 (FUNC-003-02). 활성 할인 상품 및 행정처분 이력 포함.
+      tags: [stores]
+      parameters:
+        - name: store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 상가 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreDetail"
+        "404":
+          description: 상가를 찾을 수 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: STORE_NOT_FOUND
+                message: 상가 정보를 찾을 수 없습니다.
+
+  # ── Rewards ────────────────────────────────────────────────────────────────
+  /api/v1/rewards/verify:
+    post:
+      summary: QR 코드 인증 및 포인트 적립
+      description: |
+        QR 토큰을 인증하고 포인트를 적립합니다. (FUNC-003-03)
+        - QR 토큰이 유효하지 않으면 404
+        - 오늘 이미 인증한 상가면 409
+      tags: [rewards]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrVerifyRequest"
+      responses:
+        "200":
+          description: 포인트 적립 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrVerifyResponse"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 유효하지 않은 QR 코드
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: QR_NOT_FOUND
+                message: 유효하지 않은 QR 코드입니다.
+        "409":
+          description: 오늘 이미 인증한 상가
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: ALREADY_VERIFIED_TODAY
+                message: 오늘 이미 인증한 상가입니다.
+
+  # ── Sales ──────────────────────────────────────────────────────────────────
+  /api/v1/sales/feed:
+    get:
+      summary: 세일 상품 피드
+      description: |
+        ON_SALE 상태 + 재고 있음 + 마감 전 상품만 반환합니다. (FUNC-004-01)
+        할인율: (원가-할인가)/원가 * 100
+        distance 정렬 시 user_lat, user_lon 필요.
+      tags: [sales]
+      parameters:
+        - name: small_code
+          in: query
+          description: 업종 소분류 코드 필터
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: "정렬 기준: deadline(마감 임박순) | discount(할인율 높은순) | distance(거리순)"
+          schema:
+            type: string
+            enum: [deadline, discount, distance]
+            default: deadline
+        - name: q
+          in: query
+          description: 상품명 키워드 검색
+          schema:
+            type: string
+        - name: user_lat
+          in: query
+          description: 사용자 위도 (distance 정렬 시 필요)
+          schema:
+            type: number
+            format: double
+        - name: user_lon
+          in: query
+          description: 사용자 경도 (distance 정렬 시 필요)
+          schema:
+            type: number
+            format: double
+        - name: page
+          in: query
+          description: 페이지 번호 (0-indexed)
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: size
+          in: query
+          description: 페이지 크기 (1~100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: 피드 목록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedResponse"
+
+  /api/v1/sales/stores/markers:
+    get:
+      summary: 세일 상점 지도 마커
+      description: |
+        세일 진행 중인 상점 마커 목록. (FUNC-004-02)
+        `is_expiring_soon=true`인 상점은 FE에서 마커 색상을 다르게 표시합니다.
+        마감 임박 기준: ON_SALE 상품 중 2시간 이내 마감.
+      tags: [sales]
+      parameters:
+        - name: min_lat
+          in: query
+          description: 뷰포트 최소 위도
+          schema:
+            type: number
+            format: double
+        - name: max_lat
+          in: query
+          description: 뷰포트 최대 위도
+          schema:
+            type: number
+            format: double
+        - name: min_lon
+          in: query
+          description: 뷰포트 최소 경도
+          schema:
+            type: number
+            format: double
+        - name: max_lon
+          in: query
+          description: 뷰포트 최대 경도
+          schema:
+            type: number
+            format: double
+        - name: limit
+          in: query
+          description: 최대 반환 건수 (1~2000)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 2000
+            default: 1000
+      responses:
+        "200":
+          description: 세일 상점 마커 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/SaleStoreMarker"
+
+  /api/v1/sales/stores/{sale_store_id}/subscribe:
+    post:
+      summary: 세일 상점 관심 등록
+      description: FUNC-004-01. 이미 등록된 경우 409.
+      tags: [sales]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sale_store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: 관심 등록 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubscribeResponse"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 세일 상점 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: SALE_STORE_NOT_FOUND
+                message: 세일 상점 정보를 찾을 수 없습니다.
+        "409":
+          description: 이미 관심 등록된 상점
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: SUBSCRIPTION_ALREADY_EXISTS
+                message: 이미 관심 등록된 상점입니다.
+
+    delete:
+      summary: 세일 상점 관심 해제
+      description: FUNC-004-01. 관심 등록 상태가 아니면 404.
+      tags: [sales]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: sale_store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: 관심 해제 성공
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 관심 등록된 상점이 아님
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: SUBSCRIPTION_NOT_FOUND
+                message: 관심 등록된 상점이 아닙니다.
+
+  /api/v1/sales/products/{sale_product_id}:
+    get:
+      summary: 세일 상품 상세
+      description: |
+        상품 상세 정보 (FUNC-004-03).
+        재고(stock_quantity)와 effective_status를 실시간으로 반환합니다.
+        FE는 sale_deadline과 현재 시각 차이로 카운트다운 타이머를 계산합니다.
+      tags: [sales]
+      parameters:
+        - name: sale_product_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 상품 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SaleProductDetail"
+        "404":
+          description: 상품 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: SALE_PRODUCT_NOT_FOUND
+                message: 세일 상품 정보를 찾을 수 없습니다.
+
+  # ── Recommendations ────────────────────────────────────────────────────────
+  /api/v1/recommendations:
+    get:
+      summary: 오늘의 추천 상점
+      description: |
+        사용자 QR 인증 이력 기반 선호 업종으로 현재 위치 반경 내 상점을 추천합니다. (FUNC-006-01)
+        이력이 없으면 위치 기반 전체 랜덤 추천으로 폴백합니다.
+      tags: [recommendations]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lat
+          in: query
+          required: true
+          description: 현재 위치 위도
+          schema:
+            type: number
+            format: double
+        - name: lon
+          in: query
+          required: true
+          description: 현재 위치 경도
+          schema:
+            type: number
+            format: double
+        - name: radius_km
+          in: query
+          description: 추천 반경 (km, 0.1~20.0)
+          schema:
+            type: number
+            format: float
+            minimum: 0.1
+            maximum: 20.0
+            default: 2.0
+        - name: limit
+          in: query
+          description: 최대 추천 건수 (1~100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        "200":
+          description: 추천 상점 목록
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RecommendationResponse"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Chat ───────────────────────────────────────────────────────────────────
+  /api/v1/chat/message:
+    post:
+      summary: 채팅 메시지 전송 (SSE 스트리밍)
+      description: |
+        Claude AI 응답을 SSE(Server-Sent Events) 스트림으로 반환합니다. (FUNC-005)
+
+        응답 형식 (`text/event-stream`):
+        ```
+        data: {"text": "...", "done": false}   ← 중간 청크
+        data: {"text": "", "done": true}        ← 완료 신호
+        ```
+
+        대화 이력은 Redis에 최대 20개 메시지 / 24시간 TTL로 보관됩니다.
+      tags: [chat]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatMessageRequest"
+      responses:
+        "200":
+          description: SSE 스트림
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  각 줄 형식: `data: {"text": "...", "done": false}`
+                  마지막 줄: `data: {"text": "", "done": true}`
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/chat/history:
+    get:
+      summary: 대화 이력 조회
+      description: 앱 재시작 시 대화 이력 복원용. Redis에 저장된 최근 20개 메시지. (FUNC-005)
+      tags: [chat]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 대화 이력
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatHistoryResponse"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Coupons ────────────────────────────────────────────────────────────────
+  /api/v1/coupons:
+    get:
+      summary: 구매 가능 쿠폰 목록
+      description: is_active=true인 쿠폰만 반환합니다. (FUNC-007-02)
+      tags: [coupons]
+      responses:
+        "200":
+          description: 쿠폰 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CouponItem"
+
+  /api/v1/coupons/{coupon_id}:
+    get:
+      summary: 쿠폰 상세 조회
+      description: 클릭 후 구매 전 확인 화면용 상세 정보. (FUNC-007-01)
+      tags: [coupons]
+      parameters:
+        - name: coupon_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 쿠폰 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponDetail"
+        "404":
+          description: 쿠폰 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: COUPON_NOT_FOUND
+                message: 쿠폰 정보를 찾을 수 없습니다.
+
+  /api/v1/coupons/{coupon_id}/purchase:
+    post:
+      summary: 포인트로 쿠폰 구매
+      description: |
+        포인트를 차감하고 쿠폰을 발급합니다. (FUNC-007-01)
+        - 포인트 잔액 부족 시 400
+        - 비활성 쿠폰 시 400
+        - 성공 시 바코드와 변경된 포인트 잔액 반환
+      tags: [coupons]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: coupon_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: 쿠폰 구매 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CouponPurchaseResponse"
+        "400":
+          description: 포인트 부족 또는 비활성 쿠폰
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                insufficient_point:
+                  summary: 포인트 부족
+                  value:
+                    code: INSUFFICIENT_POINT
+                    message: 포인트가 부족합니다.
+                coupon_inactive:
+                  summary: 비활성 쿠폰
+                  value:
+                    code: COUPON_INACTIVE
+                    message: 구매할 수 없는 쿠폰입니다.
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 쿠폰 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── MyPage ─────────────────────────────────────────────────────────────────
+  /api/v1/mypage/point:
+    get:
+      summary: 보유 포인트 조회
+      description: 현재 사용자의 포인트 잔액 조회. (FUNC-008-01)
+      tags: [mypage]
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: 포인트 정보
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PointResponse"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/mypage/coupons:
+    get:
+      summary: 보유 쿠폰 보관함 목록
+      description: 사용자가 보유한 쿠폰 목록. status 파라미터로 필터링 가능. (FUNC-008-02)
+      tags: [mypage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: 쿠폰 상태 필터 (생략 시 전체)
+          schema:
+            type: string
+            enum: [UNUSED, USED, EXPIRED]
+      responses:
+        "200":
+          description: 보유 쿠폰 목록
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/UserCouponItem"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/v1/mypage/coupons/{user_coupon_id}:
+    get:
+      summary: 보유 쿠폰 상세 조회
+      description: 이미지·사용기간·바코드 포함. 다른 사용자의 쿠폰이거나 없으면 404. (FUNC-008-02)
+      tags: [mypage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: user_coupon_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 보유 쿠폰 상세
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserCouponDetail"
+        "401":
+          description: 인증 오류
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: 쿠폰 없음 또는 접근 불가
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: USER_COUPON_NOT_FOUND
+                message: 보유한 쿠폰을 찾을 수 없습니다.
+
+  # ── Admin ──────────────────────────────────────────────────────────────────
+  /api/v1/admin/stores/{store_id}/qr:
+    post:
+      summary: 상가 QR 코드 발급
+      description: |
+        상가에 QR 코드를 발급합니다.
+        기존 활성 QR이 있으면 비활성화 후 새 QR을 발급합니다.
+        응답의 `qr_url` 값을 QR 이미지로 인코딩해 상가에 부착합니다.
+        형식: `dingdong://verify?token=<UUID v4>`
+      tags: [admin]
+      parameters:
+        - name: store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QrIssueRequest"
+      responses:
+        "201":
+          description: QR 발급 성공
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrIssueResponse"
+        "404":
+          description: 상가 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: STORE_NOT_FOUND
+                message: 상가 정보를 찾을 수 없습니다.
+
+    get:
+      summary: 상가 활성 QR 조회
+      description: 해당 상가에 현재 발급된 활성 QR 정보를 반환합니다.
+      tags: [admin]
+      parameters:
+        - name: store_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: 활성 QR 정보
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrIssueResponse"
+        "404":
+          description: 활성 QR 없음
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                code: STORE_QR_NOT_FOUND
+                message: 해당 상가에 발급된 QR 코드가 없습니다.
+
+tags:
+  - name: health
+    description: 서버 상태 확인
+  - name: auth
+    description: 인증 (회원가입, 로그인, 토큰 관리)
+  - name: stores
+    description: 상가 지도 마커 및 상세 (FUNC-003)
+  - name: rewards
+    description: QR 인증 및 포인트 적립 (FUNC-003-03)
+  - name: sales
+    description: 세일 피드 및 상점 (FUNC-004)
+  - name: recommendations
+    description: 오늘의 추천 상점 (FUNC-006)
+  - name: chat
+    description: AI 채팅 (FUNC-005)
+  - name: coupons
+    description: 쿠폰 목록 및 구매 (FUNC-007)
+  - name: mypage
+    description: 마이페이지 - 포인트 및 보유 쿠폰 (FUNC-008)
+  - name: admin
+    description: 관리자 - QR 코드 발급/조회

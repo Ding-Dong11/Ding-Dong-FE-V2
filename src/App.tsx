@@ -1,4 +1,6 @@
-import { Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Route, Routes, useNavigate } from "react-router-dom";
+import { setAuthFailureHandler } from "./api";
 import Onboarding from "./pages/Onboarding";
 import Login from "./pages/Login";
 import SignupEmail from "./pages/SignupEmail";
@@ -13,6 +15,14 @@ import MyPage from "./pages/MyPage";
 import Chatbot from "./pages/Chatbot";
 
 export default function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // refresh_token까지 만료되어 재로그인이 필요할 때 client.ts가 호출한다.
+    setAuthFailureHandler(() => navigate("/login", { replace: true }));
+    return () => setAuthFailureHandler(null);
+  }, [navigate]);
+
   return (
     <div className="app-frame">
       <Routes>

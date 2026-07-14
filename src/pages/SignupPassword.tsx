@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { ApiError, authApi } from "../api";
 import PageHeader from "../components/PageHeader";
 
 function PasswordField({
@@ -21,7 +22,7 @@ function PasswordField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="비밀번호를 입력해주세요"
-          className="flex-1 bg-transparent text-base outline-none placeholder:text-sub"
+          className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-sub"
         />
         <button type="button" aria-label="비밀번호 표시 전환" onClick={() => setShow((s) => !s)}>
           <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-sub" fill="none" strokeWidth="1.8" strokeLinecap="round">
@@ -37,8 +38,34 @@ function PasswordField({
 
 export default function SignupPassword() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const email = (location.state as { email?: string } | null)?.email;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!email) navigate("/signup", { replace: true });
+  }, [email, navigate]);
+
+  const signup = async () => {
+    if (loading || !email) return;
+    if (password !== confirm) {
+      setError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setError("");
+    setLoading(true);
+    try {
+      await authApi.signup({ email, password, password_confirm: confirm });
+      navigate("/login");
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "회원가입에 실패했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-1 flex-col">
@@ -47,13 +74,15 @@ export default function SignupPassword() {
         <h1 className="mb-10 mt-4 text-center text-3xl font-extrabold text-primary">회원가입</h1>
         <PasswordField label="비밀번호" value={password} onChange={setPassword} />
         <PasswordField label="비밀번호 확인" value={confirm} onChange={setConfirm} />
+        {error && <p className="mb-2 text-sm text-danger">{error}</p>}
         <div className="mt-auto pb-10">
           <button
             type="button"
-            onClick={() => navigate("/map")}
-            className="h-14 w-full rounded-xl bg-primary text-lg font-semibold text-white"
+            onClick={signup}
+            disabled={loading || !password || !confirm}
+            className="h-14 w-full rounded-xl bg-primary text-lg font-semibold text-white disabled:opacity-60"
           >
-            회원가입
+            {loading ? "가입 중..." : "회원가입"}
           </button>
           <p className="mt-3 text-center text-sm text-sub">
             계정이 있으신가요?{" "}

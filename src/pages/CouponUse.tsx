@@ -1,21 +1,40 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Barcode from "../components/Barcode";
 import BreadImage from "../components/BreadImage";
 import ChatbotFab from "../components/ChatbotFab";
 import PageHeader from "../components/PageHeader";
-import { PRODUCT } from "../data/store";
+import { mypageApi } from "../api";
+import type { UserCouponDetail, UserCouponItem } from "../api";
 
-const COUPONS = [
-  "2029137485",
-  "2029137486",
-  "2029137487",
-  "2029137488",
-  "2029137489",
-];
+function formatDate(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일까지`;
+}
 
 export default function CouponUse() {
   const trackRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  const [coupons, setCoupons] = useState<UserCouponItem[]>([]);
+  const [details, setDetails] = useState<Record<number, UserCouponDetail>>({});
+
+  useEffect(() => {
+    mypageApi
+      .getCoupons({ status: "UNUSED" })
+      .then(setCoupons)
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const current = coupons[index];
+    if (!current || details[current.user_coupon_id]) return;
+    mypageApi
+      .getCouponDetail(current.user_coupon_id)
+      .then((detail) =>
+        setDetails((prev) => ({ ...prev, [current.user_coupon_id]: detail }))
+      )
+      .catch(() => {});
+  }, [coupons, index, details]);
 
   const scrollToIndex = (i: number) => {
     const track = trackRef.current;
@@ -67,79 +86,103 @@ export default function CouponUse() {
             />
           </label>
         </div>
-        <div
-          ref={trackRef}
-          onScroll={onScroll}
-          className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-[9%]"
-        >
-          {COUPONS.map((code) => (
+        {coupons.length === 0 ? (
+          <p className="mt-16 text-center text-lg text-sub">
+            사용 가능한 쿠폰이 없습니다
+          </p>
+        ) : (
+          <>
             <div
-              key={code}
-              className="w-full shrink-0 snap-center rounded-3xl bg-white p-6 shadow-[0_6px_24px_rgba(0,0,0,0.1)]"
+              ref={trackRef}
+              onScroll={onScroll}
+              className="no-scrollbar mt-6 flex snap-x snap-mandatory gap-4 overflow-x-auto px-[9%]"
             >
-              <div className="relative overflow-hidden rounded-2xl">
-                <BreadImage className="aspect-square w-full" />
-                <span className="absolute left-4 top-4 rounded-lg bg-black/50 px-3 py-1.5 text-sm text-white">
-                  2027년 7월 11일까지
-                </span>
-              </div>
-              <p className="mt-4 text-sm text-sub">{PRODUCT.store}</p>
-              <p className="text-xl font-medium">{PRODUCT.name} 교환권</p>
-              <p className="text-2xl font-extrabold">{PRODUCT.price} P</p>
-              <p className="mt-2 text-[15px] leading-6 text-sub">
-                위 교환권은 2027년 7월 11일까지 ‘{PRODUCT.store}' 에서만 사용할
-                수 있습니다.
-              </p>
-              <div className="mt-5 flex justify-center">
-                <Barcode value={code} />
-              </div>
+              {coupons.map((coupon) => {
+                const detail = details[coupon.user_coupon_id];
+                return (
+                  <div
+                    key={coupon.user_coupon_id}
+                    className="w-full shrink-0 snap-center rounded-3xl bg-white p-6 shadow-[0_6px_24px_rgba(0,0,0,0.1)]"
+                  >
+                    <div className="relative overflow-hidden rounded-2xl">
+                      {coupon.image_url ? (
+                        <img
+                          src={coupon.image_url}
+                          alt=""
+                          className="aspect-square w-full object-cover"
+                        />
+                      ) : (
+                        <BreadImage className="aspect-square w-full" />
+                      )}
+                      {coupon.valid_until && (
+                        <span className="absolute left-4 top-4 rounded-lg bg-black/50 px-3 py-1.5 text-sm text-white">
+                          {formatDate(coupon.valid_until)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-4 text-xl font-medium">{coupon.name}</p>
+                    {detail?.description && (
+                      <p className="mt-2 text-[15px] leading-6 text-sub">
+                        {detail.description}
+                      </p>
+                    )}
+                    <div className="mt-5 flex justify-center">
+                      {detail ? (
+                        <Barcode value={detail.barcode} />
+                      ) : (
+                        <p className="text-sm text-sub">바코드 불러오는 중...</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-        <div className="mt-6 flex items-center justify-center gap-4">
-          <button
-            type="button"
-            aria-label="이전 쿠폰"
-            onClick={() => scrollToIndex(Math.max(0, index - 1))}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 stroke-neutral-300"
-              fill="none"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            >
-              <path d="m14.5 5-7 7 7 7" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <div className="flex items-center gap-2">
-            {COUPONS.map((c, i) => (
-              <span
-                key={c}
-                className={`h-2.5 rounded-full transition-all duration-300 ${
-                  i === index ? "w-7 bg-primary" : "w-2.5 bg-neutral-300"
-                }`}
-              />
-            ))}
-          </div>
-          <button
-            type="button"
-            aria-label="다음 쿠폰"
-            onClick={() =>
-              scrollToIndex(Math.min(COUPONS.length - 1, index + 1))
-            }
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-5 w-5 stroke-neutral-300"
-              fill="none"
-              strokeWidth="2.4"
-              strokeLinecap="round"
-            >
-              <path d="m9 5 7 7-7 7" strokeLinejoin="round" />
-            </svg>
-          </button>
-        </div>
+            <div className="mt-6 flex items-center justify-center gap-4">
+              <button
+                type="button"
+                aria-label="이전 쿠폰"
+                onClick={() => scrollToIndex(Math.max(0, index - 1))}
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 stroke-neutral-300"
+                  fill="none"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                >
+                  <path d="m14.5 5-7 7 7 7" strokeLinejoin="round" />
+                </svg>
+              </button>
+              <div className="flex items-center gap-2">
+                {coupons.map((c, i) => (
+                  <span
+                    key={c.user_coupon_id}
+                    className={`h-2.5 rounded-full transition-all duration-300 ${
+                      i === index ? "w-7 bg-primary" : "w-2.5 bg-neutral-300"
+                    }`}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                aria-label="다음 쿠폰"
+                onClick={() =>
+                  scrollToIndex(Math.min(coupons.length - 1, index + 1))
+                }
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5 stroke-neutral-300"
+                  fill="none"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                >
+                  <path d="m9 5 7 7-7 7" strokeLinejoin="round" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
       </div>
       <ChatbotFab className="absolute bottom-6 right-5 z-20" />
     </div>
