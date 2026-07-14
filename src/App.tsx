@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import SignupEmail from "./pages/SignupEmail";
 import SignupPassword from "./pages/SignupPassword";
 import MapPage from "./pages/MapPage";
+import QrScan from "./pages/QrScan";
 import Recommend from "./pages/Recommend";
 import Discount from "./pages/Discount";
 import PointShop from "./pages/PointShop";
@@ -20,6 +21,7 @@ export default function App() {
         <Route path="/signup" element={<SignupEmail />} />
         <Route path="/signup/password" element={<SignupPassword />} />
         <Route path="/map" element={<MapPage />} />
+        <Route path="/map/qr" element={<QrScan />} />
         <Route path="/recommend" element={<Recommend />} />
         <Route path="/discount" element={<Discount />} />
         <Route path="/coupon" element={<PointShop />} />

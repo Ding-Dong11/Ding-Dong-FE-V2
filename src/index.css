@@ -2,7 +2,9 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
 }
 
@@ -17,12 +19,19 @@ body {
 .zigzag {
   --z: 18px;
   height: var(--z);
-  background: conic-gradient(from 135deg at top, #fff 90deg, transparent 0) top / calc(var(--z) * 2) 100%;
+  background: conic-gradient(from 135deg at top, #fff 90deg, transparent 0) top /
+    calc(var(--z) * 2) 100%;
 }
 
 @keyframes pulseRing {
-  0% { transform: scale(0.6); opacity: 0.6; }
-  100% { transform: scale(1.8); opacity: 0; }
+  0% {
+    transform: scale(0.6);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.8);
+    opacity: 0;
+  }
 }
 
 .pulse-ring {
@@ -30,8 +39,14 @@ body {
 }
 
 @keyframes confettiFall {
-  0% { transform: translateY(-8px) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(26px) rotate(160deg); opacity: 0; }
+  0% {
+    transform: translateY(-8px) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(26px) rotate(160deg);
+    opacity: 0;
+  }
 }
 
 .confetti {
@@ -39,8 +54,14 @@ body {
 }
 
 @keyframes popIn {
-  0% { transform: scale(0.9); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
+  0% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .pop-in {
@@ -48,5 +69,17 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pulse-ring, .confetti, .pop-in { animation: none; }
+  .pulse-ring,
+  .confetti,
+  .pop-in {
+    animation: none;
+  }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }
