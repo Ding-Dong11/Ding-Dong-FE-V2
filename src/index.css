@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  @apply bg-neutral-200 font-sans text-ink antialiased;
+}
+
+.app-frame {
+  @apply relative mx-auto flex h-full min-h-dvh w-full max-w-[430px] flex-col overflow-hidden bg-white;
+}
+
+.zigzag {
+  --z: 18px;
+  height: var(--z);
+  background: conic-gradient(from 135deg at top, #fff 90deg, transparent 0) top / calc(var(--z) * 2) 100%;
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.6); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+.pulse-ring {
+  animation: pulseRing 1.8s ease-out infinite;
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-8px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(26px) rotate(160deg); opacity: 0; }
+}
+
+.confetti {
+  animation: confettiFall 1.6s ease-in infinite;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.pop-in {
+  animation: popIn 0.22s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-ring, .confetti, .pop-in { animation: none; }
+}
