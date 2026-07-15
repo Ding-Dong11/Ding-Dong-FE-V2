@@ -90,10 +90,10 @@ export default function MyPage() {
       <h1 className="py-8 text-center text-xl font-extrabold">마이페이지</h1>
       <div className="min-h-0 flex-1 overflow-hidden rounded-t-3xl bg-white">
         <div className="flex h-full flex-col overflow-y-auto px-6 pt-8">
-          <div className="flex items-center justify-between border-b border-neutral-200 pb-6">
+          <div className="border-b border-neutral-200 pb-6">
             <p className="text-xl font-extrabold">{email}</p>
-            <span className="rounded-full bg-primary px-4 py-1.5 text-lg font-bold text-white">
-              {point} P
+            <span className="mt-3 inline-block rounded-full bg-primary px-4 py-1.5 text-lg font-bold text-white">
+              {point.toLocaleString()} P
             </span>
           </div>
           <button

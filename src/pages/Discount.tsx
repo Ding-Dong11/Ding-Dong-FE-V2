@@ -6,15 +6,28 @@ import ChatbotFab from "../components/ChatbotFab";
 import { salesApi } from "../api";
 import type { SaleProductCard } from "../api";
 
+function DiscountSkeletonCard() {
+  return (
+    <div>
+      <div className="aspect-square animate-pulse rounded-2xl bg-neutral-100" />
+      <div className="mt-2.5 h-3.5 w-2/3 animate-pulse rounded bg-neutral-100" />
+      <div className="mt-2 h-[22px] w-4/5 animate-pulse rounded bg-neutral-100" />
+      <div className="mt-2 h-7 w-1/2 animate-pulse rounded bg-neutral-100" />
+    </div>
+  );
+}
+
 export default function Discount() {
   const navigate = useNavigate();
   const [items, setItems] = useState<SaleProductCard[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     salesApi
       .getFeed({ sort: "deadline" })
       .then((res) => setItems(res.items))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
   return (
@@ -25,7 +38,14 @@ export default function Discount() {
             할인상품
           </h1>
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 px-5">
-            {items.map((item) => {
+            {loading ? (
+              Array.from({ length: 6 }, (_, i) => <DiscountSkeletonCard key={i} />)
+            ) : items.length === 0 ? (
+              <p className="col-span-2 mt-10 text-center text-lg text-sub">
+                할인 중인 상품이 없습니다
+              </p>
+            ) : (
+              items.map((item) => {
               const soldOut = item.effective_status !== "ON_SALE";
               return (
                 <button
@@ -75,7 +95,8 @@ export default function Discount() {
                   </p>
                 </button>
               );
-            })}
+              })
+            )}
           </div>
         </div>
         <ChatbotFab className="absolute right-4 top-4 z-20" />

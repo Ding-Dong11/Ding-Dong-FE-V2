@@ -99,6 +99,18 @@ export type StoreDetail = {
   dispositions: DispositionSummary[];
 };
 
+export type StoreSearchItem = {
+  store_id: number;
+  store_name: string;
+  branch_name?: string | null;
+  road_address?: string | null;
+  longitude: number;
+  latitude: number;
+  has_active_qr: boolean;
+  has_disposition: boolean;
+  has_sale: boolean;
+};
+
 export type StoreMarkersParams = {
   /** 현재 지도 줌(카카오맵 level) 값. 서버 클러스터링 판단 기준이라 항상 포함해야 한다. */
   zoom: number;

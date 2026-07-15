@@ -26,10 +26,24 @@ function StoreThumb() {
   );
 }
 
+function RecommendSkeletonRow() {
+  return (
+    <div className="flex items-center gap-4 rounded-2xl bg-field p-4">
+      <div className="h-[74px] w-[74px] shrink-0 animate-pulse rounded-xl bg-neutral-200" />
+      <div className="min-w-0 flex-1">
+        <div className="h-[22px] w-3/4 animate-pulse rounded bg-neutral-200" />
+        <div className="mt-2 h-[19px] w-full animate-pulse rounded bg-neutral-200" />
+        <div className="mt-1.5 h-[19px] w-2/3 animate-pulse rounded bg-neutral-200" />
+      </div>
+    </div>
+  );
+}
+
 export default function Recommend() {
   const navigate = useNavigate();
   const [date, setDate] = useState("");
   const [stores, setStores] = useState<RecommendationItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const copy = (text: string) => navigator.clipboard?.writeText(text);
 
   useEffect(() => {
@@ -40,7 +54,8 @@ export default function Recommend() {
           setDate(res.date);
           setStores(res.items);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setLoading(false));
     };
 
     if (!navigator.geolocation) {
@@ -63,12 +78,14 @@ export default function Recommend() {
         <div className="h-full overflow-y-auto pb-6">
           <h1 className="py-6 text-center text-xl font-extrabold">{title}</h1>
           <div className="flex flex-col gap-4 px-5">
-            {stores.length === 0 && (
+            {loading ? (
+              Array.from({ length: 4 }, (_, i) => <RecommendSkeletonRow key={i} />)
+            ) : stores.length === 0 ? (
               <p className="mt-10 text-center text-lg text-sub">
                 추천할 상점이 없습니다
               </p>
-            )}
-            {stores.map((s) => (
+            ) : (
+              stores.map((s) => (
               <button
                 key={s.store_id}
                 type="button"
@@ -118,7 +135,8 @@ export default function Recommend() {
                   <path d="m9 5 7 7-7 7" strokeLinejoin="round" />
                 </svg>
               </button>
-            ))}
+              ))
+            )}
           </div>
         </div>
         <ChatbotFab className="absolute right-4 top-4 z-20" />

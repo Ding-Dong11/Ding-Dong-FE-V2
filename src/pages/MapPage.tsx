@@ -7,7 +7,7 @@ import BreadImage from "../components/BreadImage";
 import ChatbotFab from "../components/ChatbotFab";
 import Mascot from "../components/Mascot";
 import { storesApi } from "../api";
-import type { AreaMarker, MarkerItem, StoreDetail, StoreMarker } from "../api";
+import type { AreaMarker, MarkerItem, StoreDetail, StoreMarker, StoreSearchItem } from "../api";
 
 const CENTER = { lat: 35.6866, lng: 127.9095 };
 const DEFAULT_LEVEL = 4;
@@ -522,6 +522,10 @@ export default function MapPage() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [visit, setVisit] = useState<{ storeName: string; awardedPoint: number } | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  // null: 검색 시작 전(드롭다운 닫힘) / []: 검색했지만 결과 없음
+  const [searchResults, setSearchResults] = useState<StoreSearchItem[] | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const fetchTimerRef = useRef<number | null>(null);
   const lastFetchRef = useRef<FetchedBounds | null>(null);
 
@@ -672,6 +676,43 @@ export default function MapPage() {
       .finally(() => setDetailLoading(false));
   }, [selectedStoreId]);
 
+  // 검색어 입력 300ms 후 조회. 그 사이 입력이 바뀌면 이전 타이머를 취소한다.
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      storesApi
+        .search(q, 20)
+        .then(setSearchResults)
+        .catch(() => setSearchResults([]))
+        .finally(() => setSearchLoading(false));
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
+
+  const handleSearchSelect = useCallback(
+    (item: StoreSearchItem) => {
+      if (map) {
+        map.setLevel(3);
+        map.panTo(new kakao.maps.LatLng(item.latitude, item.longitude));
+      }
+      setSelectedStoreId(item.store_id);
+      setSearchQuery("");
+      setSearchResults(null);
+    },
+    [map]
+  );
+
+  const clearSearch = useCallback(() => {
+    setSearchQuery("");
+    setSearchResults(null);
+  }, []);
+
   const recenter = () => {
     if (!map) return;
     map.setLevel(DEFAULT_LEVEL);
@@ -748,12 +789,67 @@ export default function MapPage() {
               <path d="m20 20-3.8-3.8" />
             </svg>
             <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="검색어를 입력해주세요"
-              className="w-full bg-transparent text-base outline-none placeholder:text-sub"
+              className="min-w-0 w-full bg-transparent text-base outline-none placeholder:text-sub"
             />
+            {searchQuery && (
+              <button type="button" aria-label="검색어 지우기" onClick={clearSearch} className="shrink-0">
+                <svg viewBox="0 0 24 24" className="h-5 w-5 stroke-sub" fill="none" strokeWidth="2" strokeLinecap="round">
+                  <path d="M6 6 18 18M18 6 6 18" />
+                </svg>
+              </button>
+            )}
           </label>
           <ChatbotFab className="shrink-0" />
         </div>
+
+        {searchResults !== null && (
+          <div className="absolute left-4 right-[84px] top-[72px] z-10 max-h-[60vh] overflow-y-auto rounded-2xl bg-white p-2 shadow-fab">
+            {searchLoading ? (
+              <p className="p-4 text-center text-sm text-sub">검색 중...</p>
+            ) : searchResults.length === 0 ? (
+              <p className="p-4 text-center text-sm text-sub">검색 결과가 없습니다</p>
+            ) : (
+              searchResults.map((item) => (
+                <button
+                  key={item.store_id}
+                  type="button"
+                  onClick={() => handleSearchSelect(item)}
+                  className="flex w-full flex-col items-start gap-1 rounded-xl px-3 py-2.5 text-left active:bg-field"
+                >
+                  <p className="text-base font-semibold">
+                    {item.store_name}
+                    {item.branch_name ? ` ${item.branch_name}` : ""}
+                  </p>
+                  {item.road_address && (
+                    <p className="truncate text-xs text-sub">{item.road_address}</p>
+                  )}
+                  {(item.has_active_qr || item.has_sale || item.has_disposition) && (
+                    <div className="flex gap-1.5">
+                      {item.has_active_qr && (
+                        <span className="rounded-full bg-[#2E7D32] px-2 py-0.5 text-[10px] font-semibold text-white">
+                          QR 적립 가능
+                        </span>
+                      )}
+                      {item.has_sale && (
+                        <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] font-semibold text-white">
+                          할인 상품
+                        </span>
+                      )}
+                      {item.has_disposition && (
+                        <span className="rounded-full bg-danger px-2 py-0.5 text-[10px] font-semibold text-white">
+                          행정처분
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+        )}
 
         <button
           type="button"
