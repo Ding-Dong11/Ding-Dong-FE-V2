@@ -121,7 +121,7 @@ export default function CouponUse() {
                         </span>
                       )}
                     </div>
-                    <p className="mt-4 text-xl font-medium">{coupon.name}</p>
+                    <p className="mt-4 truncate text-xl font-medium">{coupon.name}</p>
                     {detail?.description && (
                       <p className="mt-2 text-[15px] leading-6 text-sub">
                         {detail.description}

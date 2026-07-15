@@ -5,7 +5,13 @@ import ChatbotFab from "../components/ChatbotFab";
 import { ApiError, couponsApi } from "../api";
 import type { CouponItem } from "../api";
 
-function SearchBar() {
+function SearchBar({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
   return (
     <label className="mx-5 flex h-[52px] items-center gap-2.5 rounded-full border border-neutral-200 px-5">
       <svg
@@ -19,6 +25,8 @@ function SearchBar() {
         <path d="m20 20-3.8-3.8" />
       </svg>
       <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
         placeholder="검색어를 입력해주세요"
         className="w-full bg-transparent text-base outline-none placeholder:text-sub"
       />
@@ -99,13 +107,17 @@ export default function PointShop() {
   const [items, setItems] = useState<CouponItem[]>([]);
   const [exchangedIds, setExchangedIds] = useState<number[]>([]);
   const [openCoupon, setOpenCoupon] = useState<CouponItem | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
-    couponsApi
-      .getList()
-      .then(setItems)
-      .catch(() => {});
-  }, []);
+    const timer = setTimeout(() => {
+      couponsApi
+        .getList({ q: search.trim() || undefined })
+        .then(setItems)
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -114,7 +126,7 @@ export default function PointShop() {
           <h1 className="py-6 text-center text-xl font-extrabold">
             포인트 사용
           </h1>
-          <SearchBar />
+          <SearchBar value={search} onChange={setSearch} />
           <div className="mt-6 grid grid-cols-2 gap-x-4 gap-y-8 px-5">
             {items.map((item) => {
               const exchanged = exchangedIds.includes(item.coupon_id);
@@ -135,7 +147,7 @@ export default function PointShop() {
                     )}
                   </div>
                   <p
-                    className={`mt-2.5 text-lg font-medium ${
+                    className={`mt-2.5 truncate text-lg font-medium ${
                       exchanged ? "text-neutral-300" : ""
                     }`}
                   >

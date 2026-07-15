@@ -253,12 +253,16 @@ function StoreSheet({
               )}
               <span
                 className={`inline-block rounded-full px-3.5 py-1.5 text-sm font-semibold ${
-                  detail.has_active_qr
+                  detail.has_active_qr && !detail.cooldown_days_left
                     ? "bg-primary text-white"
                     : "bg-[#E9EBEE] text-sub"
                 }`}
               >
-                {detail.has_active_qr ? "포인트 지급" : "7일 뒤 포인트 지급"}
+                {detail.cooldown_days_left
+                  ? `${detail.cooldown_days_left}일 뒤 포인트 지급`
+                  : detail.has_active_qr
+                    ? "포인트 지급"
+                    : "포인트 지급 불가"}
               </span>
               <h2 className="mt-3 text-2xl font-extrabold">
                 {detail.store_name}
@@ -281,28 +285,25 @@ function StoreSheet({
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
                     {detail.sale_products.map((p) => (
-                      <div
-                        key={p.sale_product_id}
-                        className="relative aspect-square overflow-hidden rounded-xl"
-                      >
-                        {p.image_url ? (
-                          <img
-                            src={p.image_url}
-                            alt=""
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <BreadImage className="h-full w-full" />
-                        )}
-                        <div className="absolute bottom-2.5 left-3 text-white [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
-                          <p className="text-sm font-medium">{p.name}</p>
-                          <p className="text-lg font-bold">
-                            <span className="text-[#FF6B6B]">
-                              {Math.round(p.discount_rate)}%
-                            </span>{" "}
-                            {p.sale_price.toLocaleString()}
-                          </p>
+                      <div key={p.sale_product_id}>
+                        <div className="relative aspect-square overflow-hidden rounded-xl">
+                          {p.image_url ? (
+                            <img
+                              src={p.image_url}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <BreadImage className="h-full w-full" />
+                          )}
                         </div>
+                        <p className="mt-2 truncate text-sm font-medium">{p.name}</p>
+                        <p className="text-lg font-bold">
+                          <span className="text-danger">
+                            {Math.round(p.discount_rate)}%
+                          </span>{" "}
+                          {p.sale_price.toLocaleString()}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -884,7 +885,7 @@ export default function MapPage() {
         <button
           type="button"
           onClick={() => navigate("/map/qr")}
-          className="absolute bottom-4 left-4 right-4 z-10 h-14 rounded-2xl bg-primary text-lg font-semibold text-white shadow-fab"
+          className="absolute bottom-4 left-4 right-4 z-30 h-14 rounded-2xl bg-primary text-lg font-semibold text-white shadow-fab"
         >
           방문 확인
         </button>

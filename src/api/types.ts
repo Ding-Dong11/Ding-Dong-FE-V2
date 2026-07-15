@@ -95,6 +95,8 @@ export type StoreDetail = {
   latitude: number;
   image_url?: string | null;
   has_active_qr: boolean;
+  /** 로그인 사용자가 이 상가에서 최근 적립해 쿨다운 중이면 남은 일수, 아니면 null */
+  cooldown_days_left?: number | null;
   sale_products: SaleProductSummary[];
   dispositions: DispositionSummary[];
 };
@@ -269,6 +271,12 @@ export type CouponItem = {
 };
 
 export type CouponDetail = CouponItem;
+
+export type CouponListParams = {
+  q?: string;
+  min_price?: number;
+  max_price?: number;
+};
 
 export type CouponStatus = "UNUSED" | "USED" | "EXPIRED";
 

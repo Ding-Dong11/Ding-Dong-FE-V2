@@ -1,8 +1,9 @@
 import { apiFetch } from "./client";
-import type { CouponDetail, CouponItem, CouponPurchaseResponse } from "./types";
+import type { CouponDetail, CouponItem, CouponListParams, CouponPurchaseResponse } from "./types";
 
 export const couponsApi = {
-  getList: () => apiFetch<CouponItem[]>("/api/v1/coupons", { auth: false }),
+  getList: (params: CouponListParams = {}) =>
+    apiFetch<CouponItem[]>("/api/v1/coupons", { auth: false, params }),
 
   getDetail: (couponId: number) =>
     apiFetch<CouponDetail>(`/api/v1/coupons/${couponId}`, { auth: false }),
