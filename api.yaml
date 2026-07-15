@@ -169,6 +169,52 @@ components:
           has_sale,
         ]
 
+    StoreSearchResult:
+      type: object
+      description: GET /stores/search 결과 한 건
+      properties:
+        store_id:
+          type: integer
+          example: 1024
+        store_name:
+          type: string
+          example: 스타벅스
+        branch_name:
+          type: string
+          nullable: true
+          example: 강남역점
+        road_address:
+          type: string
+          nullable: true
+          example: 서울특별시 강남구 강남대로 396
+        longitude:
+          type: number
+          format: double
+          example: 127.0276
+        latitude:
+          type: number
+          format: double
+          example: 37.4979
+        has_active_qr:
+          type: boolean
+          description: 포인트 적립 가능 상가 여부 (마커 색상 구분용)
+        has_disposition:
+          type: boolean
+          description: 행정처분 이력 존재 여부
+        has_sale:
+          type: boolean
+          description: 활성 할인 상품 존재 여부
+      required:
+        [
+          store_id,
+          store_name,
+          longitude,
+          latitude,
+          has_active_qr,
+          has_disposition,
+          has_sale,
+        ]
+
     SaleProductSummary:
       type: object
       description: 마커 팝업 내 할인 상품 카드
@@ -1015,6 +1061,61 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/StoreMarker"
+
+  /api/v1/stores/search:
+    get:
+      summary: 상가 전문검색
+      description: |
+        상가명·지점명·도로명주소를 대상으로 PostgreSQL tsvector 전문검색을 수행합니다. (FUNC-003-01)
+
+        - 검색어는 `plainto_tsquery('simple', q)` 로 처리 — 형태소 분석 없이 토큰 매칭.
+        - 결과는 `ts_rank` 내림차순(관련도 높은 순) 정렬.
+        - 검색 결과 항목에는 지도 이동에 필요한 `longitude`/`latitude` 와 핀 색상 구분 플래그가 포함됩니다.
+        - 결과 선택 시 해당 좌표로 지도를 이동(`map.setCenter`)한 뒤 `GET /stores/{store_id}` 로 상세 팝업을 표시하는 패턴을 권장합니다.
+      tags: [stores]
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: 상가명 또는 도로명주소 검색어 (1~100자)
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example: 스타벅스
+        - name: limit
+          in: query
+          description: 최대 반환 건수 (1~50, 기본 20)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        "200":
+          description: 검색 결과 목록 (관련도 내림차순, 결과 없으면 빈 배열)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StoreSearchResult"
+              example:
+                - store_id: 1024
+                  store_name: 스타벅스
+                  branch_name: 강남역점
+                  road_address: 서울특별시 강남구 강남대로 396
+                  longitude: 127.0276
+                  latitude: 37.4979
+                  has_active_qr: true
+                  has_disposition: false
+                  has_sale: false
+        "422":
+          description: 유효성 오류 (q 누락 또는 길이 초과)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /api/v1/stores/{store_id}:
     get:

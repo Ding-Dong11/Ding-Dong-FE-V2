@@ -6,6 +6,21 @@ import ChatbotFab from "../components/ChatbotFab";
 import { salesApi } from "../api";
 import type { SaleProductCard } from "../api";
 
+function ProductThumb({ imageUrl, dim }: { imageUrl?: string | null; dim?: boolean }) {
+  const [failed, setFailed] = useState(false);
+  if (!imageUrl || failed) {
+    return <BreadImage className="h-full w-full" dim={dim} />;
+  }
+  return (
+    <img
+      src={imageUrl}
+      alt=""
+      onError={() => setFailed(true)}
+      className={`h-full w-full object-cover ${dim ? "brightness-50" : ""}`}
+    />
+  );
+}
+
 function DiscountSkeletonCard() {
   return (
     <div>
@@ -54,13 +69,13 @@ export default function Discount() {
                   disabled={soldOut}
                   onClick={() =>
                     navigate("/map", {
-                      state: { openStoreId: item.sale_store_id },
+                      state: { openStoreId: item.store_id },
                     })
                   }
                   className="text-left"
                 >
                   <div className="relative aspect-square overflow-hidden rounded-2xl">
-                    <BreadImage className="h-full w-full" dim={soldOut} />
+                    <ProductThumb imageUrl={item.image_url} dim={soldOut} />
                     {soldOut ? (
                       <span className="absolute inset-0 flex items-center justify-center text-lg font-medium text-white">
                         {item.effective_status === "SOLD_OUT" ? "품절" : "마감"}

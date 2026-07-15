@@ -137,6 +137,7 @@ export type QrVerifyResponse = {
 export type SaleProductCard = {
   sale_product_id: number;
   sale_store_id: number;
+  store_id: number;
   store_name: string;
   name: string;
   original_price: number;
@@ -146,6 +147,7 @@ export type SaleProductCard = {
   sale_deadline: string;
   effective_status: EffectiveStatus;
   small_code?: string | null;
+  image_url?: string | null;
 };
 
 export type FeedResponse = {

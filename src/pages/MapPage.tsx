@@ -520,6 +520,8 @@ export default function MapPage() {
   const [groupedStores, setGroupedStores] = useState<StoreMarker[] | null>(null);
   const [detail, setDetail] = useState<StoreDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  // 다른 페이지에서 openStoreId로 진입했을 때만 상세 로드 후 그 상가 좌표로 지도를 이동시킨다.
+  const [pendingPan, setPendingPan] = useState(false);
   const [visit, setVisit] = useState<{ storeName: string; awardedPoint: number } | null>(null);
   const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -658,6 +660,7 @@ export default function MapPage() {
       setVisit({ storeName: state.storeName ?? "", awardedPoint: state.awardedPoint ?? 0 });
     }
     if (state?.openStoreId) {
+      setPendingPan(true);
       setSelectedStoreId(state.openStoreId);
     }
     if (state) navigate(location.pathname, { replace: true, state: null });
@@ -675,6 +678,14 @@ export default function MapPage() {
       .catch(() => setDetail(null))
       .finally(() => setDetailLoading(false));
   }, [selectedStoreId]);
+
+  // map과 detail이 모두 준비되는 시점(순서 무관)에 한 번만 그 상가 좌표로 이동한다.
+  useEffect(() => {
+    if (!pendingPan || !map || !detail) return;
+    map.setLevel(3);
+    map.panTo(new kakao.maps.LatLng(detail.latitude, detail.longitude));
+    setPendingPan(false);
+  }, [pendingPan, map, detail]);
 
   // 검색어 입력 300ms 후 조회. 그 사이 입력이 바뀌면 이전 타이머를 취소한다.
   useEffect(() => {
