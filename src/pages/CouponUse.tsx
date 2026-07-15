@@ -67,7 +67,8 @@ export default function CouponUse() {
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <PageHeader title="쿠폰 사용" />
-      <div className="min-h-0 flex-1 overflow-y-auto pb-6">
+      <div className="relative min-h-0 flex-1">
+      <div className="h-full overflow-y-auto pb-6">
         <div className="px-5 pt-2">
           <label className="flex h-[52px] items-center gap-2.5 rounded-full border border-neutral-200 px-5">
             <svg
@@ -184,7 +185,8 @@ export default function CouponUse() {
           </>
         )}
       </div>
-      <ChatbotFab className="absolute bottom-6 right-5 z-20" />
+      <ChatbotFab className="absolute right-4 top-4 z-20" />
+      </div>
     </div>
   );
 }

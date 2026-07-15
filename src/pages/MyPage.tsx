@@ -86,9 +86,9 @@ export default function MyPage() {
   };
 
   return (
-    <div className="flex flex-1 flex-col bg-[#F7CE79]">
+    <div className="relative flex flex-1 flex-col bg-[#F7CE79]">
       <h1 className="py-8 text-center text-xl font-extrabold">마이페이지</h1>
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-t-3xl bg-white">
+      <div className="min-h-0 flex-1 overflow-hidden rounded-t-3xl bg-white">
         <div className="flex h-full flex-col overflow-y-auto px-6 pt-8">
           <div className="flex items-center justify-between border-b border-neutral-200 pb-6">
             <p className="text-xl font-extrabold">{email}</p>
@@ -143,8 +143,8 @@ export default function MyPage() {
             회원탈퇴
           </button>
         </div>
-        <ChatbotFab className="absolute bottom-6 right-5 z-20" />
       </div>
+      <ChatbotFab className="absolute right-4 top-4 z-20" />
       {showWithdraw && (
         <WithdrawModal
           onClose={() => setShowWithdraw(false)}

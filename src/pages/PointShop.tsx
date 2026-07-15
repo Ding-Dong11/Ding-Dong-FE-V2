@@ -153,7 +153,7 @@ export default function PointShop() {
             })}
           </div>
         </div>
-        <ChatbotFab className="absolute bottom-5 right-5 z-20" />
+        <ChatbotFab className="absolute right-4 top-4 z-20" />
       </div>
       {openCoupon && (
         <ExchangeModal
